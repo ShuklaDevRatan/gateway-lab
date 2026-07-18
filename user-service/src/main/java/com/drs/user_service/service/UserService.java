@@ -3,6 +3,7 @@ package com.drs.user_service.service;
 import com.drs.user_service.dto.CreateUserRequest;
 import com.drs.user_service.dto.UserResponse;
 import com.drs.user_service.entity.User;
+import com.drs.user_service.exception.EmailAlreadyExistsException;
 import com.drs.user_service.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +22,7 @@ public class UserService {
     public UserResponse createUser(CreateUserRequest request) {
 
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new RuntimeException("Email already exists.");
+            throw new EmailAlreadyExistsException("Email already exists.");
         }
 
         User user = new User();
