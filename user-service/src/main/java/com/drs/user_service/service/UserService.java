@@ -14,7 +14,6 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
-
     public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
@@ -24,17 +23,20 @@ public class UserService {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new EmailAlreadyExistsException("Email already exists.");
         }
-
         User user = new User();
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setApiKey(UUID.randomUUID().toString());
         user.setCreatedAt(LocalDateTime.now());
-
         User savedUser = userRepository.save(user);
         return mapToUserResponse(savedUser) ;
     }
 
+
+    public boolean isValidApiKey(String apikey){
+        return userRepository.findByApiKey(apikey).isPresent();
+
+    }
 
     private UserResponse mapToUserResponse(User user){
         UserResponse response = new UserResponse();
