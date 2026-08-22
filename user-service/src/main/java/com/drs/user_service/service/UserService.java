@@ -47,4 +47,13 @@ public class UserService {
         response.setCreatedAt(user.getCreatedAt());
         return response;
     }
+
+
+    public UserResponse getUserById(Long id) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow();
+
+        return mapToUserResponse(user);
+    }
 }

@@ -2,91 +2,59 @@ package com.drs.gateway_service.filter;
 
 import com.drs.gateway_service.client.UserServiceClient;
 import com.drs.gateway_service.exception.AuthenticationServiceUnavailableException;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryRegistry;
-import jakarta.servlet.*;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
-import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
-import java.io.IOException;
-import java.util.concurrent.Callable;
 
-public class ApiKeyAuthenticationFilter implements Filter {
+@Component
+public class ApiKeyAuthenticationFilter implements GlobalFilter {
 
     private final UserServiceClient userServiceClient;
-    private final CircuitBreakerFactory circuitBreakerFactory;
-    private final RetryRegistry retryRegistry;
-
 
     public ApiKeyAuthenticationFilter(
-            UserServiceClient userServiceClient,
-            CircuitBreakerFactory circuitBreakerFactory,
-            RetryRegistry retryRegistry) {
+            UserServiceClient userServiceClient) {
 
         this.userServiceClient = userServiceClient;
-        this.circuitBreakerFactory = circuitBreakerFactory;
-        this.retryRegistry = retryRegistry;
     }
 
+
     @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
-        HttpServletRequest request = (HttpServletRequest) servletRequest;
-        HttpServletResponse response = (HttpServletResponse) servletResponse;
+    public Mono<Void> filter(
+            ServerWebExchange exchange,
+            GatewayFilterChain chain) {
+        String apiKey = exchange.getRequest()
+                .getHeaders()
+                .getFirst("X-API-KEY");
 
+        ServerHttpResponse response =
+                exchange.getResponse();
 
-        String apiKey = request.getHeader("X-API-KEY");
+        if (apiKey == null || apiKey.isBlank()) {
 
-        CircuitBreaker circuitBreaker =
-                circuitBreakerFactory.create("user-service");
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
 
-        Retry retry = retryRegistry.retry("user-service");
-
-
-
-        if(apiKey == null || apiKey.isBlank()){
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("API Key is missing");
-            return;
+            return response.setComplete();
         }
 
-        try {
-
-            Callable<Boolean> retryableCall =
-                    Retry.decorateCallable(
-                            retry,
-                            () -> userServiceClient.validateApiKey(apiKey)
-                    );
-
-            Boolean isValid =
-                    circuitBreaker.run(
-                            () -> {
-                                try {
-                                    return retryableCall.call();
-                                } catch (Exception e) {
-                                    throw new RuntimeException(e);
-                                }
-                            },
-                            throwable -> {
-                                throw new AuthenticationServiceUnavailableException(
-                                        "Authentication service is unavailable"
-                                );
-                            }
-                    );
-
-            if (!Boolean.TRUE.equals(isValid)) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("Invalid API Key");
-                return;
+        // authentication check yahan aayega
+        System.out.println("API Key Filter: " + apiKey);
+        Mono<Boolean> validationResult =
+                userServiceClient.validateApiKey(apiKey);
+        return validationResult.flatMap(isValid -> {
+            if (Boolean.TRUE.equals(isValid)) {
+                return chain.filter(exchange);
             }
-
-        } catch (AuthenticationServiceUnavailableException e) {
-            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
-            response.getWriter().write(e.getMessage());
-            return;
-        }
-
-        filterChain.doFilter(servletRequest, servletResponse);
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            return response.setComplete();
+        }).onErrorMap(error ->
+                new AuthenticationServiceUnavailableException(
+                        "Authentication service is unavailable"
+                )
+        );
     }
 }
