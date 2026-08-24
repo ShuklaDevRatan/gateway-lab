@@ -36,7 +36,7 @@ public class UserServiceClient {
         Mono<Boolean> webClientCall =
                 webClientBuilder.build()
                         .get()
-                        .uri("/internal/users/validate-api-key")
+                        .uri("lb://user-service/internal/users/validate-api-key")
                         .header("X-API-KEY", apiKey)
                         .retrieve()
                         .bodyToMono(Boolean.class);
