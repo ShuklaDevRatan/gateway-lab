@@ -19,7 +19,6 @@ public class InternalAuthController {
 
     @GetMapping("/validate-api-key")
     public ResponseEntity<Boolean> validateApiKey(@RequestHeader("X-API-KEY") String apiKey){
-        System.out.println("User Service received validation request");
         System.out.println("Received API Key: " + apiKey);
         return ResponseEntity.ok(userService.isValidApiKey(apiKey));
     }
