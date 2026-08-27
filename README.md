@@ -1150,7 +1150,9 @@ These are intentionally kept outside the current implementation so that the core
 ---
 
 #  Project Focus
+
 The main objective of this project was not simply to create multiple Spring Boot services.
+
 The project focuses on understanding how a distributed system behaves when services:
 
 - communicate with each other,
